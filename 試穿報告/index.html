@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>試穿報告</title>
+<style>
+  :root{
+    --bg:#f7f5f3; --card:#fff; --line:#e7e3df; --text:#2b2a33; --muted:#77737c;
+    --accent:#5b4f66; --soft:#f2f0f4; --appr:#f8f6f1; --chg:#b4541a;
+    --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:"Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;padding:20px 24px}
+  header{display:flex;gap:14px;align-items:center;margin-bottom:22px}
+  .ico{width:50px;height:50px;border-radius:12px;background:#ece9ef;display:grid;place-items:center;font-size:22px}
+  h1{margin:0;font-size:24px}
+  header p{margin:4px 0 0;color:var(--muted);font-size:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .tabs{display:flex;gap:6px;padding:0 6px;border-bottom:1px solid var(--line)}
+  .tab{padding:14px 20px 12px;font-weight:700;color:#4a4752;cursor:pointer;border-bottom:2px solid transparent;font-size:16px}
+  .tab.on{border-color:var(--accent);color:var(--text)}
+  .badge{display:inline-block;background:#eeecef;border-radius:10px;font-size:12px;padding:1px 8px;margin-left:6px}
+  .filters{display:flex;gap:10px;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line);font-size:14px;color:#4a4752}
+  .filters select,.filters input{height:46px;border:1px solid var(--line);border-radius:10px;padding:0 14px;font:inherit;color:var(--muted);background:#fff}
+  .filters select{width:450px}
+  .filters input{width:180px}
+  .wrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:15px;min-width:1300px}
+  th{background:#faf9fb;font-weight:700;color:#4a4752;text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+  th.grp{text-align:center;border-left:1px solid var(--line);border-right:1px solid var(--line);padding-bottom:4px}
+  th.sub{font-size:13px;text-align:center;padding:4px 6px 10px}
+  th.sub.first{border-left:1px solid var(--line)}
+  th.sub.last{border-right:1px solid var(--line)}
+  td{padding:8px 12px;vertical-align:middle}
+  tr.apply td{border-bottom:1px dashed var(--line)}
+  tr.appr td{border-bottom:1px solid var(--line)}
+  td.span{border-bottom:1px solid var(--line) !important}
+  td.num{text-align:right;width:50px}
+  .mono{font-family:var(--mono)}
+  .ver{color:var(--muted);font-size:12px;margin-left:6px}
+  .thumb{width:46px;height:46px;border-radius:6px;border:1px solid var(--line)}
+  .t1{background:linear-gradient(135deg,#6b4a3a,#c9a27e 50%,#3a3a3a)}
+  .t2{background:linear-gradient(135deg,#f4f1ec,#ddd6cc)}
+  td.kind{font-size:13px;font-weight:700;color:#4a4752;white-space:nowrap;padding-right:6px}
+  tr.appr td.kind,tr.appr td.fee,tr.appr td.total{background:var(--appr)}
+  tr.appr td.kind{color:#7a5a20}
+  .fee{text-align:center;padding:6px 4px}
+  .fee.first{border-left:1px solid var(--line)}
+  .fee.last{border-right:1px solid var(--line)}
+  .fee input{width:78px;height:34px;border:1.5px solid #d9d4dc;border-radius:8px;text-align:right;padding:0 8px;font:14px var(--mono);background:#fff}
+  .fee .v{font-family:var(--mono);display:inline-block;min-width:60px;text-align:right}
+  .fee .chg,.fee input.chg{color:var(--chg);font-weight:700}
+  .fee input.chg{border-color:#e3b48f}
+  .fee .dash{color:var(--muted)}
+  .subname{width:72px;border:1px dashed #c9c3cd;border-radius:6px;font:700 13px inherit;text-align:center;padding:3px;background:#fff;color:#4a4752}
+  .addcol{width:30px;height:30px;border-radius:8px;border:1.5px dashed var(--accent);background:#fff;color:var(--accent);font-size:18px;cursor:pointer;line-height:1}
+  .addcol:hover{background:var(--soft)}
+  .del{border:none;background:none;color:#b3adb8;cursor:pointer;font-size:12px;margin-left:2px}
+  .del:hover{color:#c0392b}
+  td.total{font-family:var(--mono);text-align:right;font-weight:700;white-space:nowrap}
+  .memobox{display:flex;align-items:flex-start;gap:4px;min-width:200px;min-height:72px;border:1.5px solid #d9d4dc;border-radius:8px;padding:6px 6px 6px 10px;background:#fff}
+  .memobox.on{border-color:var(--accent);box-shadow:0 0 0 3px var(--soft)}
+  .memo{flex:1;border:none;outline:none;resize:none;min-height:58px;font:14px/1.5 inherit;color:var(--text);background:transparent;padding:0}
+  .memo:disabled{color:var(--text)}
+  .pen{flex:none;width:28px;height:28px;border:1px solid var(--line);border-radius:7px;background:#fff;cursor:pointer;font-size:14px;color:#4a4752}
+  .pen:hover{background:var(--soft)}
+  .pen.save{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn{width:40px;height:36px;border:1px solid var(--line);border-radius:9px;background:#fff;cursor:pointer;font-size:16px}
+  .btn.save{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .legend{padding:10px 16px;font-size:13px;color:var(--muted)}
+  .legend b{color:var(--chg)}
+  .empty{height:120px}
+
+  /* ===== 手機版：表格改成一筆一張卡片 ===== */
+  #mlist{display:none}
+  @media (max-width:767px){
+    body{padding:12px}
+    header{margin-bottom:14px;gap:10px}
+    .ico{width:40px;height:40px;font-size:18px}
+    h1{font-size:20px}
+    header p{font-size:12px}
+    .tabs{overflow-x:auto;gap:0;padding:0}
+    .tab{padding:12px 14px 10px;font-size:15px;white-space:nowrap}
+    .filters{flex-wrap:wrap;padding:12px;gap:8px}
+    .filters select{width:100%;height:42px;font-size:14px}
+    .filters input{flex:1;width:auto;min-width:0;height:42px}
+    .wrap{display:none}
+    #mlist{display:block;padding:12px;background:#faf9f8}
+    .empty{display:none}
+    .legend{padding:10px 12px 14px;font-size:12px}
+  }
+  .mcard{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+  .mhead{display:flex;gap:12px;align-items:center}
+  .mhead .thumb{width:56px;height:56px}
+  .minfo{flex:1;min-width:0}
+  .minfo .st{font:700 16px var(--mono)}
+  .minfo .meta{font-size:13px;color:var(--muted);margin-top:3px}
+  .minfo .meta b{font-family:var(--mono);font-weight:400;color:var(--text)}
+  .mno{align-self:flex-start;font-size:12px;color:var(--muted);background:#f2f0f4;border-radius:10px;padding:2px 8px}
+  .mlabel{font-size:13px;font-weight:700;color:#4a4752;margin:14px 0 6px;display:flex;align-items:center;justify-content:space-between}
+  .mcard .memobox{min-width:0;width:100%}
+  .mcard .memo{font-size:16px}
+  .mcard .pen{width:34px;height:34px}
+  .mfees{display:grid;grid-template-columns:minmax(90px,1.1fr) 1fr 1fr;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .mfees > div{padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;font-size:14px}
+  .mfees .mh{background:#faf9fb;font-size:12px;font-weight:700;color:#4a4752}
+  .mfees .mh.ap,.mfees .ap{background:var(--appr)}
+  .mfees .mh.ap{color:#7a5a20}
+  .mfees .nm{font-weight:700;color:#4a4752;font-size:13px;gap:2px}
+  .mfees .val{justify-content:flex-end}
+  .mfees .val input{width:100%;height:40px;border:1.5px solid #d9d4dc;border-radius:8px;text-align:right;padding:0 8px;font:16px var(--mono);background:#fff}
+  .mfees .val input.chg{color:var(--chg);font-weight:700;border-color:#e3b48f}
+  .mfees .val .v{font-family:var(--mono)}
+  .mfees .val .chg{color:var(--chg);font-weight:700}
+  .mfees .val .dash{color:var(--muted)}
+  .mfees .tot{font:700 15px var(--mono);border-bottom:none}
+  .mfees .tot.nm{font-family:inherit;font-size:13px}
+  .mfees .subname{width:100%;font-size:14px}
+  .madd{grid-column:1 / -1;justify-content:center}
+  .madd .addcol{width:auto;height:34px;padding:0 14px;font-size:14px}
+  .mcard .btn{height:32px;width:auto;padding:0 12px;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <div class="ico">📋</div>
+  <div>
+    <h1>試穿報告</h1>
+    <p>按右邊的修改鈕：生產填申請工繳、主管在下方確認批價（預設帶入申請金額），按打勾儲存；按「＋」可新增工繳項目</p>
+  </div>
+</header>
+
+<div class="card">
+  <div class="tabs">
+    <div class="tab on">全部<span class="badge">2</span></div>
+    <div class="tab">待填工繳</div>
+    <div class="tab">待批價<span class="badge">2</span></div>
+    <div class="tab">已批價</div>
+  </div>
+  <div class="filters">
+    <select><option>選擇樣本號（打部分文字搜尋，可多選）</option></select>
+    試穿日 <input type="text" placeholder="從"> 到 <input type="text" placeholder="到">
+  </div>
+  <div class="wrap">
+    <table>
+      <thead id="thead"></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  <div id="mlist"></div>
+  <div class="legend">確認批價列有框的格子可直接修改（預設帶入申請金額）；主管改過的數字以 <b>橘色</b> 顯示。合計不含發單工繳(RMB)。申請工繳與備註按 ✎ 修改。</div>
+  <div class="empty"></div>
+</div>
+
+<script>
+  // 工繳項目（欄位），可用「＋」新增
+  const RMB = "發單工繳(RMB)";
+  const feeCols = ["工繳", RMB, "手工"];
+  const FIXED = feeCols.length; // 預設項目不可刪除/改名
+  const demoFees = { 工繳: "230", 手工: "25" };
+
+  const rows = [
+    { no: 1, img: "t1", style: "F7201-1", ver: "V1", item: "72119", date: "2026/11/23", memo: "", fees: { ...demoFees }, appr: {} },
+    { no: 2, img: "t2", style: "F7203-1", ver: "V1", item: "72121", date: "2026/11/24", memo: "", fees: { ...demoFees }, appr: {} },
+  ];
+  let editing = null;
+  let memoEditing = null; // 備註用自己的筆單獨修改
+
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  // 批價值：主管沒改過就沿用申請金額
+  const apprVal = (r, c) => (c in r.appr ? r.appr[c] : r.fees[c]) ?? "";
+  // 合計不含 RMB（幣別不同）
+  const sum = (r, get) => feeCols.reduce((s, c) => c === RMB ? s : s + (parseFloat(get(r, c)) || 0), 0);
+  const fmt = n => n ? n.toLocaleString() : "—";
+  const applyVal = (r, c) => r.fees[c] ?? "";
+
+  function feeInner(r, idx, c, kind, ed) {
+    const v = kind === "fees" ? applyVal(r, c) : apprVal(r, c);
+    const changed = kind === "appr" && String(v) !== String(applyVal(r, c));
+    // 主管批價：一律顯示有框的輸入格，隨時可改
+    if (ed || kind === "appr") return `<input type="number" inputmode="decimal" class="${changed ? "chg" : ""}" data-row="${idx}" data-kind="${kind}" data-fee="${esc(c)}" value="${esc(v)}">`;
+    return v !== "" ? `<span class="v ${changed ? "chg" : ""}">${esc(v)}</span>` : `<span class="dash">—</span>`;
+  }
+  const feeCell = (r, idx, c, i, kind, ed) => `<td class="fee ${i === 0 ? "first" : ""}">${feeInner(r, idx, c, kind, ed)}</td>`;
+  const colName = (c, i) => i < FIXED ? esc(c)
+    : `<input class="subname" value="${esc(c)}" data-col="${i}" placeholder="項目名稱"><button class="del" data-del="${i}" title="刪除此項">✕</button>`;
+  const memoBox = (r, idx) => `<div class="memobox ${memoEditing === idx ? "on" : ""}">
+          <textarea class="memo" data-memo="${idx}" ${memoEditing === idx ? "" : "disabled"} placeholder="${memoEditing === idx ? "輸入備註" : ""}">${esc(r.memo)}</textarea>
+          <button class="pen ${memoEditing === idx ? "save" : ""}" data-memoedit="${idx}" title="${memoEditing === idx ? "儲存備註" : "修改備註"}">${memoEditing === idx ? "✓" : "✎"}</button>
+        </div>`;
+
+  const mq = window.matchMedia("(max-width: 767px)");
+  mq.addEventListener("change", render);
+
+  function render() {
+    if (mq.matches) { renderMobile(); return; }
+    document.getElementById("mlist").innerHTML = "";
+    renderTable();
+  }
+
+  // 手機版：一筆一張卡片，工繳明細改成「項目｜申請｜批價」直向列表
+  function renderMobile() {
+    document.getElementById("thead").innerHTML = "";
+    document.getElementById("tbody").innerHTML = "";
+    document.getElementById("mlist").innerHTML = rows.map((r, idx) => {
+      const ed = editing === idx;
+      return `<div class="mcard">
+        <div class="mhead">
+          <div class="thumb ${r.img}"></div>
+          <div class="minfo">
+            <div class="st">${r.style}<span class="ver">${r.ver}</span></div>
+            <div class="meta">貨號 <b>${r.item}</b>　試穿日 <b>${r.date}</b></div>
+          </div>
+          <div class="mno">#${r.no}</div>
+        </div>
+        <div class="mlabel">備註</div>
+        ${memoBox(r, idx)}
+        <div class="mlabel">工繳明細
+          <button class="btn ${ed ? "save" : ""}" data-edit="${idx}">${ed ? "✓ 儲存申請" : "✎ 修改申請"}</button>
+        </div>
+        <div class="mfees">
+          <div class="mh">項目</div><div class="mh val">申請（生產）</div><div class="mh val ap">批價（主管）</div>
+          ${feeCols.map((c, i) => `
+            <div class="nm">${colName(c, i)}</div>
+            <div class="val">${feeInner(r, idx, c, "fees", ed)}</div>
+            <div class="val ap">${feeInner(r, idx, c, "appr", ed)}</div>`).join("")}
+          <div class="madd"><button class="addcol" id="addcol">＋ 新增項目</button></div>
+          <div class="tot nm">合計</div>
+          <div class="tot val" data-total="fees-${idx}">${fmt(sum(r, applyVal))}</div>
+          <div class="tot val ap" data-total="appr-${idx}">${fmt(sum(r, apprVal))}</div>
+        </div>
+      </div>`;
+    }).join("");
+    // 手機上只有第一張卡片放 id，其餘「＋」用 class 觸發
+    document.querySelectorAll("#mlist .addcol").forEach(b => { b.removeAttribute("id"); b.dataset.addcol = "1"; });
+  }
+
+  function renderTable() {
+    const n = feeCols.length;
+    document.getElementById("thead").innerHTML = `
+      <tr>
+        <th rowspan="2">序號</th><th rowspan="2">附圖</th><th rowspan="2">樣號</th>
+        <th rowspan="2">貨號</th><th rowspan="2">備註</th><th rowspan="2">試穿日</th>
+        <th rowspan="2"></th>
+        <th class="grp" colspan="${n + 1}">工繳明細</th>
+        <th rowspan="2" style="text-align:right">合計</th>
+        <th rowspan="2"></th>
+      </tr>
+      <tr>
+        ${feeCols.map((c, i) => `<th class="sub ${i === 0 ? "first" : ""}">${
+          i < FIXED ? esc(c)
+                : `<input class="subname" value="${esc(c)}" data-col="${i}" placeholder="項目名稱"><button class="del" data-del="${i}" title="刪除此項">✕</button>`
+        }</th>`).join("")}
+        <th class="sub last"><button class="addcol" id="addcol" title="新增工繳項目">＋</button></th>
+      </tr>`;
+
+    document.getElementById("tbody").innerHTML = rows.map((r, idx) => {
+      const ed = editing === idx;
+      return `
+      <tr class="apply">
+        <td class="num span" rowspan="2">${r.no}</td>
+        <td class="span" rowspan="2"><div class="thumb ${r.img}"></div></td>
+        <td class="mono span" rowspan="2">${r.style}<span class="ver">${r.ver}</span></td>
+        <td class="mono span" rowspan="2">${r.item}</td>
+        <td class="span" rowspan="2"><div class="memobox ${memoEditing === idx ? "on" : ""}">
+          <textarea class="memo" data-memo="${idx}" ${memoEditing === idx ? "" : "disabled"} placeholder="${memoEditing === idx ? "輸入備註" : ""}">${esc(r.memo)}</textarea>
+          <button class="pen ${memoEditing === idx ? "save" : ""}" data-memoedit="${idx}" title="${memoEditing === idx ? "儲存備註" : "修改備註"}">${memoEditing === idx ? "✓" : "✎"}</button>
+        </div></td>
+        <td class="mono span" rowspan="2">${r.date}</td>
+        <td class="kind">申請工繳（生產）</td>
+        ${feeCols.map((c, i) => feeCell(r, idx, c, i, "fees", ed)).join("")}
+        <td class="fee last"></td>
+        <td class="total" data-total="fees-${idx}">${fmt(sum(r, applyVal))}</td>
+        <td class="span" rowspan="2"><button class="btn ${ed ? "save" : ""}" data-edit="${idx}">${ed ? "✓" : "✎"}</button></td>
+      </tr>
+      <tr class="appr">
+        <td class="kind">確認批價（主管）</td>
+        ${feeCols.map((c, i) => feeCell(r, idx, c, i, "appr", ed)).join("")}
+        <td class="fee last"></td>
+        <td class="total" data-total="appr-${idx}">${fmt(sum(r, apprVal))}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  document.addEventListener("click", e => {
+    if (e.target.id === "addcol" || e.target.dataset.addcol) {
+      let k = 1, name;
+      do { name = "其他" + k++; } while (feeCols.includes(name));
+      feeCols.push(name);
+      render();
+      document.querySelector(`.subname[data-col="${feeCols.length - 1}"]`)?.select();
+    }
+    const del = e.target.dataset.del;
+    if (del !== undefined) {
+      const name = feeCols[del];
+      feeCols.splice(del, 1);
+      rows.forEach(r => { delete r.fees[name]; delete r.appr[name]; });
+      render();
+    }
+    const ed = e.target.dataset.edit;
+    if (ed !== undefined) { editing = editing === +ed ? null : +ed; render(); }
+    const me = e.target.dataset.memoedit;
+    if (me !== undefined) {
+      memoEditing = memoEditing === +me ? null : +me;
+      render();
+      if (memoEditing !== null) document.querySelector(`[data-memo="${me}"]`)?.focus();
+    }
+  });
+
+  document.addEventListener("input", e => {
+    const d = e.target.dataset;
+    if (d.fee !== undefined) {
+      const r = rows[d.row];
+      r[d.kind][d.fee] = e.target.value;
+      // 更新合計與「主管改過」的標色
+      document.querySelector(`[data-total="fees-${d.row}"]`).textContent = fmt(sum(r, applyVal));
+      document.querySelector(`[data-total="appr-${d.row}"]`).textContent = fmt(sum(r, apprVal));
+      document.querySelectorAll(`input[data-row="${d.row}"][data-kind="appr"]`).forEach(inp => {
+        const c = inp.dataset.fee;
+        if (inp !== e.target && !(c in r.appr)) inp.value = apprVal(r, c);
+        inp.classList.toggle("chg", String(apprVal(r, c)) !== String(applyVal(r, c)));
+      });
+    }
+    if (d.memo !== undefined) rows[d.memo].memo = e.target.value;
+  });
+
+  // 改自訂項目名稱（離開輸入框時套用）
+  document.addEventListener("change", e => {
+    const col = e.target.dataset.col;
+    if (col === undefined) return;
+    const oldName = feeCols[col], newName = e.target.value.trim();
+    if (!newName || (newName !== oldName && feeCols.includes(newName))) { e.target.value = oldName; return; }
+    rows.forEach(r => ["fees", "appr"].forEach(k => {
+      if (oldName in r[k]) { r[k][newName] = r[k][oldName]; delete r[k][oldName]; }
+    }));
+    feeCols[col] = newName;
+    render();
+  });
+
+  render();
+</script>
+</body>
+</html>

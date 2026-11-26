@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="robots" content="noindex">
+<title>製樣排程系統</title>
+<meta name="theme-color" content="#f7f5f3">
+<style>
+  /* 版面：上方切換「製樣排程管理／樣本師取工作」，下方依品牌分三區（IRIS → IRISGIRLS → 修改） */
+  :root{
+    --bg:#f7f5f3; --card:#fff; --line:#e7e3df; --text:#2b2a33; --muted:#77737c; --sub:#4a4752;
+    --accent:#5b4f66; --soft:#f2f0f4; --field:#d9d4dc; --head:#faf9fb; --list:#faf9f8;
+    --urgent:#c0392b; --urgentbg:#fdf1ef; --urgentline:#e8b9b2;
+    --iris:#5b4f66; --girls:#b0507a; --mod:#2f6f73;
+    --doing:#2c5d9b; --doingbg:#eef3fa; --done:#3d7a46; --donebg:#eef6ef; --waitbg:#f0eef2; --waitfg:#6b6672;
+    --onaccent:#fff; --shade:rgba(43,42,51,.35);
+    --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
+    color-scheme:light;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:"Noto Sans TC","Microsoft JhengHei","PingFang TC",system-ui,sans-serif;font-size:15px;
+    padding-block:16px 24px;padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px));-webkit-text-size-adjust:100%}
+  body.lock{overflow:hidden}
+  button,input,select,textarea{font-family:inherit}
+  button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  /* ===== 上方切換列 ===== */
+  .appnav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+  .switch{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:#ebe8ee;padding:4px;border-radius:12px;flex:0 1 460px;min-width:0}
+  .switch button{height:42px;border:none;border-radius:9px;background:transparent;font-weight:700;font-size:15px;color:var(--sub);cursor:pointer;white-space:nowrap}
+  .switch button.on{background:var(--card);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+  .appnav .grow{flex:1}
+  .resetbtn{height:36px;padding:0 12px;border:1px dashed #c9c3cd;border-radius:9px;background:var(--card);color:var(--muted);font-size:13px;cursor:pointer}
+  .demo-note{font-size:12px;color:var(--muted)}
+
+  header{display:flex;gap:14px;align-items:center;margin-bottom:18px;flex-wrap:wrap}
+  header .title{flex:1 1 320px;min-width:0;display:flex;gap:14px;align-items:center}
+  .ico{width:50px;height:50px;border-radius:12px;background:#ece9ef;display:grid;place-items:center;font-size:22px;flex:none}
+  h1{margin:0;font-size:24px;text-wrap:balance}
+  header p{margin:4px 0 0;color:var(--muted);font-size:14px}
+  .who{font-size:14px;color:var(--muted);display:flex;align-items:center;gap:6px;white-space:nowrap}
+  .who select{height:36px;border:1.5px solid var(--field);border-radius:8px;font-size:15px;font-weight:700;color:var(--text);background:var(--card);padding:0 8px}
+
+  /* ===== 區塊與標籤 ===== */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:18px}
+  .card > h2{margin:0;padding:12px 16px;font-size:17px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .card.iris > h2{border-top:4px solid var(--iris)}
+  .card.girls > h2{border-top:4px solid var(--girls)}
+  .card.mod > h2{border-top:4px solid var(--mod)}
+  .card.done > h2{border-top:4px solid var(--done)}
+  .kindtag,.brandtag{display:inline-block;border-radius:6px;font-size:12px;font-weight:700;padding:2px 8px;color:var(--onaccent);background:var(--iris);letter-spacing:.3px}
+  .kindtag.girls,.brandtag.girls{background:var(--girls)}
+  .kindtag.mod{background:var(--mod)}
+  .kindtag.done{background:var(--done)}
+  .badge{display:inline-block;background:#eeecef;border-radius:10px;font-size:12px;font-weight:400;padding:1px 8px;color:var(--text)}
+  .badge.urg{background:var(--urgentbg);color:var(--urgent)}
+  .urgtag{display:inline-block;background:var(--urgent);color:var(--onaccent);border-radius:6px;font-size:12px;font-weight:700;padding:2px 8px;white-space:nowrap}
+  .normtag{color:var(--muted);font-size:13px}
+  .st-tag{display:inline-block;border-radius:6px;font-size:12px;font-weight:700;padding:3px 8px;white-space:nowrap}
+  .st-tag.wait{background:var(--waitbg);color:var(--waitfg)}
+  .st-tag.doing{background:var(--doingbg);color:var(--doing)}
+  .st-tag.done{background:var(--donebg);color:var(--done)}
+  .emptymsg{padding:26px 16px;text-align:center;color:var(--muted);font-size:14px}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .nowrap{white-space:nowrap}
+
+  /* 表格（桌機） */
+  .wrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:15px;min-width:860px}
+  th{background:var(--head);font-weight:700;color:var(--sub);text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:10px 12px;vertical-align:middle;border-bottom:1px solid var(--line)}
+  tr:last-child td{border-bottom:none}
+  tr.isurg td{background:var(--urgentbg)}
+  td.num{text-align:right;width:50px;color:var(--muted)}
+  td.content{white-space:pre-wrap;line-height:1.5;min-width:260px}
+
+  /* 卡片（手機、平板） */
+  .mlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:12px;padding:14px;background:var(--list)}
+  .mlist .emptymsg{grid-column:1 / -1}
+  .mcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;gap:12px;align-items:flex-start;min-width:0}
+  .mcard.isurg{border-color:var(--urgentline);background:var(--urgentbg)}
+  .minfo{flex:1;min-width:0}
+  .minfo .st{font:700 17px var(--mono);word-break:break-all}
+  .minfo .meta{font-size:13px;color:var(--muted);margin-top:5px;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center}
+  .minfo .meta b{font-family:var(--mono);font-weight:400;color:var(--text)}
+  .minfo .meta b.name{font-family:inherit}
+  .minfo .txt{white-space:pre-wrap;font-size:14px;line-height:1.5;margin-top:8px}
+  .mside{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+
+  /* ===== 管理頁 ===== */
+  .addbtn{height:42px;padding:0 18px;border-radius:10px;border:none;background:var(--accent);color:var(--onaccent);font-weight:700;font-size:15px;cursor:pointer;white-space:nowrap;flex:none}
+  .addbtn:hover{filter:brightness(1.1)}
+  .urgtoggle{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:14px}
+  .urgtoggle input{width:18px;height:18px;accent-color:var(--urgent);cursor:pointer}
+  .del{border:1px solid var(--line);background:var(--card);color:#8a8590;border-radius:8px;width:34px;height:32px;cursor:pointer}
+  .del:hover{color:var(--urgent);border-color:var(--urgentline)}
+
+  /* 視窗（新增工作、確認） */
+  .mask{position:fixed;inset:0;background:var(--shade);display:none;align-items:center;justify-content:center;
+    padding:16px max(16px,env(safe-area-inset-right,0px)) 16px max(16px,env(safe-area-inset-left,0px));z-index:10}
+  .mask.on{display:flex}
+  #askMask{z-index:20}
+  .dlg{background:var(--card);border-radius:14px;width:520px;max-width:100%;max-height:100%;overflow-y:auto;padding:20px;box-shadow:0 10px 40px rgba(0,0,0,.18)}
+  .dlg.small{width:400px}
+  .dlg h3{margin:0 0 14px;font-size:19px}
+  .dlg .msg{font-size:16px;line-height:1.6;margin:0 0 18px;white-space:pre-wrap}
+  .seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--soft);padding:4px;border-radius:11px;margin-bottom:16px}
+  .seg button{height:40px;border:none;border-radius:8px;background:transparent;font-weight:700;font-size:15px;color:var(--sub);cursor:pointer}
+  .seg button.on{background:var(--card);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+  .seg button.on[data-kind=sample]{color:var(--accent)}
+  .seg button.on[data-kind=mod]{color:var(--mod)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .row3{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:12px}
+  .fld{margin-bottom:14px;min-width:0}
+  .fld label{display:block;font-size:14px;font-weight:700;color:var(--sub);margin-bottom:6px}
+  .fld input,.fld select,.fld textarea{width:100%;height:44px;border:1.5px solid var(--field);border-radius:10px;padding:0 12px;font-size:15px;background:var(--card);color:var(--text)}
+  .fld textarea{height:auto;min-height:120px;padding:10px 12px;line-height:1.5;resize:vertical}
+  .fld input:focus,.fld select:focus,.fld textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--soft)}
+  .fld input[readonly]{background:#f6f5f7;color:var(--sub);font-weight:700}
+  .fld input.small{font-family:var(--mono);text-align:center;font-size:17px}
+  .fld input[type=date]{-webkit-appearance:none;appearance:none;display:block;min-height:44px;line-height:44px}
+  .hint{font-size:12px;color:var(--muted);margin-top:4px}
+  .hint b{color:var(--text)}
+  .err{font-size:13px;color:var(--urgent);min-height:18px;margin-bottom:6px}
+  .fld .chk{display:flex;align-items:center;gap:8px;margin:0;min-height:44px;padding:0 12px;border:1.5px solid var(--field);border-radius:10px;cursor:pointer;font-size:15px}
+  .chk input{width:20px;height:20px;accent-color:var(--urgent)}
+  .chk.on{border-color:var(--urgent);background:var(--urgentbg);color:var(--urgent);font-weight:700}
+  .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+  .acts button{height:42px;padding:0 18px;border-radius:10px;font-weight:700;font-size:15px;cursor:pointer}
+  .cancel{border:1px solid var(--line);background:var(--card);color:var(--sub)}
+  .ok{border:none;background:var(--accent);color:var(--onaccent)}
+  .ok.mod{background:var(--mod)}
+  .ok.danger{background:var(--urgent)}
+  .ok.done{background:var(--done)}
+
+  /* 提示訊息 */
+  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--text);color:var(--bg);
+    padding:10px 18px;border-radius:10px;font-size:14px;z-index:30;opacity:0;pointer-events:none;transition:opacity .2s}
+  .toast.on{opacity:1}
+
+  /* ===== 樣本師頁 ===== */
+  .tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:#ebe8ee;padding:5px;border-radius:12px;margin-bottom:18px;max-width:520px}
+  .tab{height:46px;border:none;border-radius:9px;background:transparent;font-weight:700;font-size:16px;color:var(--sub);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+  .tab.on{background:var(--card);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+  .job{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+  .job.isurg{border-color:var(--urgentline);background:var(--urgentbg)}
+  .job.isdone{opacity:.6}
+  .job .top{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .job .top .grow{flex:1}
+  .job .code{font:700 20px var(--mono);word-break:break-all}
+  .job .code small{font-family:inherit;font-weight:400;font-size:14px;color:var(--muted);margin-left:8px}
+  .job .code small b{font:700 18px var(--mono);color:var(--text)}
+  .job .meta{font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 14px}
+  .job .meta b{color:var(--text);font-weight:400}
+  .job .txt{white-space:pre-wrap;font-size:15px;line-height:1.55;background:var(--head);border-radius:8px;padding:8px 10px}
+  .job .jacts{display:flex;gap:8px;margin-top:2px}
+  .job .jacts button{flex:1;height:46px;border-radius:10px;font-weight:700;font-size:16px;cursor:pointer}
+  .take{border:none;background:var(--accent);color:var(--onaccent)}
+  .take.mod{background:var(--mod)}
+  .finish{border:none;background:var(--done);color:var(--onaccent)}
+  .putback{border:1px solid var(--line);background:var(--card);color:var(--sub);flex:0 0 96px !important}
+  .doneat{font-size:13px;color:var(--done)}
+  #viewMaker .mlist{display:grid}
+
+  /* ===== 響應式 ===== */
+  @media (max-width:1100px){ #viewManage .wrap{display:none} .dlg{width:560px} }
+  @media (min-width:1101px){ #viewManage .mlist{display:none} }
+  @media (max-width:767px){
+    body{padding-block:12px calc(24px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+    #viewManage{padding-bottom:72px}
+    .switch{flex-basis:100%}
+    header{margin-bottom:14px;gap:10px}
+    header .title{gap:10px;flex-basis:100%}
+    .ico{width:40px;height:40px;font-size:18px}
+    h1{font-size:20px}
+    header p{font-size:12px}
+    .card > h2{font-size:16px}
+    .mlist{grid-template-columns:1fr;padding:10px;gap:10px}
+    .addbtn{position:fixed;z-index:5;left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px));height:52px;font-size:16px;box-shadow:0 6px 20px rgba(43,42,51,.28)}
+    .mask{padding:0;align-items:flex-end}
+    .dlg,.dlg.small{width:100%;border-radius:16px 16px 0 0;max-height:92vh;max-height:92dvh;
+      padding:18px max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+    .acts button{flex:1}
+    .tabs{max-width:none}
+    .toast{bottom:calc(80px + env(safe-area-inset-bottom,0px))}
+  }
+  @media (max-width:420px){
+    .row2,.row3{grid-template-columns:1fr;gap:0}
+    .row2 .sp{display:none}
+  }
+  @media (max-height:520px) and (orientation:landscape){
+    .dlg{max-height:100vh;max-height:100dvh;border-radius:0}
+    .mask{padding:0}
+    .fld textarea{min-height:80px}
+  }
+  @media (pointer:coarse){
+    .del{width:44px;height:44px}
+    .urgtoggle{min-height:44px}
+    .urgtoggle input{width:24px;height:24px}
+    .seg button{height:46px}
+    .acts button{height:48px}
+    .fld input,.fld select{height:48px}
+    .fld input,.fld select,.fld textarea{font-size:16px}
+    .fld input[type=date]{min-height:48px;line-height:48px}
+    .fld .chk{min-height:48px}
+    .chk input{width:24px;height:24px}
+    .who select{height:42px;font-size:16px}
+    .switch button{height:46px}
+    .job .jacts button{height:52px}
+    .tab{height:50px}
+  }
+  @media (prefers-reduced-motion:reduce){ .toast{transition:none} }
+</style>
+</head>
+<body>
+
+<nav class="appnav" aria-label="切換畫面">
+  <div class="switch">
+    <button id="goManage" class="on">🗓️ 製樣排程管理</button>
+    <button id="goMaker">🧵 樣本師取工作</button>
+  </div>
+  <span class="grow"></span>
+  <span class="demo-note">示範資料</span>
+  <button class="resetbtn" id="resetDemo">重設示範資料</button>
+</nav>
+
+<!-- ================= 製樣排程管理 ================= -->
+<section id="viewManage">
+  <header>
+    <div class="title">
+      <div class="ico">🗓️</div>
+      <div>
+        <h1>製樣排程管理</h1>
+        <p>設計師新增樣本或修改；依品牌分區，每區依急件 → 系列別 → 排單日期排序</p>
+      </div>
+    </div>
+    <label class="who" for="mWho">設計師（登入）
+      <select id="mWho"></select>
+    </label>
+    <button class="addbtn" id="openAdd">＋ 新增工作</button>
+  </header>
+  <div id="mSections"></div>
+
+  <div class="mask" id="mask">
+    <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+      <h3 id="dlgTitle">新增工作</h3>
+      <div class="seg">
+        <button data-kind="sample" class="on">1. 樣本</button>
+        <button data-kind="mod">2. 修改</button>
+      </div>
+
+      <div id="formSample">
+        <div class="fld">
+          <label for="fStyle">樣本號</label>
+          <input type="text" id="fStyle" list="styleOpts" placeholder="輸入部分文字搜尋，例如 2201" autocomplete="off">
+          <div class="hint">品牌自動帶樣號第 2 碼（2、6＝IRIS；1、5＝IRISGIRLS），系列別自動帶第 1 碼（可修改）</div>
+        </div>
+        <div class="row3">
+          <div class="fld">
+            <label for="fBrand">品牌別</label>
+            <input type="text" id="fBrand" readonly placeholder="自動帶出">
+          </div>
+          <div class="fld">
+            <label for="fSeries">系列別</label>
+            <input type="text" id="fSeries" placeholder="第 1 碼">
+          </div>
+          <div class="fld">
+            <label for="fColor">色號</label>
+            <input type="text" id="fColor" class="small" list="colorOpts" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="例 15">
+            <datalist id="colorOpts"></datalist>
+          </div>
+        </div>
+        <div class="hint" id="colorHint" style="margin:-8px 0 14px"></div>
+        <div class="row2">
+          <div class="fld">
+            <label for="fSampleDate">排樣日</label>
+            <input type="date" id="fSampleDate">
+          </div>
+          <div class="fld">
+            <label class="sp">&nbsp;</label>
+            <label class="chk"><input type="checkbox" id="fUrgent"> 急件</label>
+          </div>
+        </div>
+      </div>
+
+      <div id="formMod" hidden>
+        <div class="row2">
+          <div class="fld">
+            <label for="fModNo">修改號</label>
+            <input type="text" id="fModNo" list="styleOpts" placeholder="選樣號或直接輸入" autocomplete="off">
+            <div class="hint" id="modBrandHint"></div>
+          </div>
+          <div class="fld">
+            <label for="fModDate">排修日</label>
+            <input type="date" id="fModDate">
+          </div>
+        </div>
+        <div class="fld">
+          <label for="fModText">修改內容</label>
+          <textarea id="fModText" placeholder="輸入要修改的內容，例如：袖長加長 2cm、領口改圓領"></textarea>
+        </div>
+        <div class="fld">
+          <label class="chk"><input type="checkbox" id="fModUrgent"> 急件</label>
+        </div>
+      </div>
+
+      <datalist id="styleOpts"></datalist>
+      <div class="err" id="err"></div>
+      <div class="acts">
+        <button class="cancel" id="cancelAdd">取消</button>
+        <button class="ok" id="saveAdd">加入樣本排程</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 樣本師取工作 ================= -->
+<section id="viewMaker" hidden>
+  <header>
+    <div class="title">
+      <div class="ico">🧵</div>
+      <div>
+        <h1>樣本師取工作</h1>
+        <p>點「取樣本／取修改」把工作領到自己名下；分區與排序同管理頁</p>
+      </div>
+    </div>
+    <label class="who" for="kWho">樣本師（登入）
+      <select id="kWho"></select>
+    </label>
+  </header>
+  <div class="tabs">
+    <button class="tab on" data-tab="wait">待取工作 <span class="badge" id="cWait">0</span></button>
+    <button class="tab" data-tab="mine">我的工作 <span class="badge" id="cMine">0</span></button>
+  </div>
+  <div id="kSections"></div>
+</section>
+
+<!-- 確認視窗（取代瀏覽器的 confirm） -->
+<div class="mask" id="askMask">
+  <div class="dlg small" role="alertdialog" aria-modal="true" aria-labelledby="askTitle">
+    <h3 id="askTitle">請確認</h3>
+    <p class="msg" id="askMsg"></p>
+    <div class="acts">
+      <button class="cancel" id="askNo">取消</button>
+      <button class="ok" id="askYes">確定</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* ===================== 共用資料與邏輯 ===================== */
+const SCHED = (() => {
+  const KEY = "sampleSchedule.v1";
+  const COLORS = ["15", "16", "51", "52", "88", "89"];
+  const DESIGNERS = ["張月珠", "張家稜", "王稜雅"];
+  const MAKERS = ["吳秀鳳", "陳惠紅", "張簡鈺洳", "莊春鳳"];
+  const STYLES = ["A2105-2", "B5108-1", "C1112-1", "D6120-1", "F2201-1", "F6203-1", "K1101-1", "K5104-1"];
+  const BRANDS = ["IRIS", "IRISGIRLS"];
+
+  // 系列別＝樣號第 1 碼；品牌＝樣號第 2 碼（2、6 → IRIS；1、5 → IRISGIRLS）
+  const seriesOf = code => (code || "").trim().charAt(0).toUpperCase();
+  const brandOf = code => {
+    const c = (code || "").trim().charAt(1);
+    if (c === "2" || c === "6") return "IRIS";
+    if (c === "1" || c === "5") return "IRISGIRLS";
+    return "";
+  };
+  const brandRank = b => { const i = BRANDS.indexOf(b); return i < 0 ? BRANDS.length : i; };
+
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const ymd = d => d ? d.replaceAll("-", "/") : "—";
+  const pad = n => String(n).padStart(2, "0");
+  const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+  const nowText = () => { const d = new Date(); return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+  const addDays = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+
+  // 示範資料：日期以今天為基準，任何時候打開都合理
+  function seed() {
+    let id = 0;
+    const s = (style, color, designer, day, urgent) => ({ id: ++id, type: "sample", style, series: seriesOf(style), brand: brandOf(style), color, designer, date: addDays(day), urgent, status: "待取", taker: "" });
+    const m = (no, text, designer, day, urgent) => ({ id: ++id, type: "mod", no, text, series: brandOf(no) ? seriesOf(no) : "", brand: brandOf(no), designer, date: addDays(day), urgent, status: "待取", taker: "" });
+    return { seq: 9, items: [
+      s("F2201-1", "15", "張月珠", 1, true),
+      s("A2105-2", "51", "張家稜", 2, false),
+      s("F6203-1", "88", "王稜雅", 1, false),
+      s("D6120-1", "16", "張月珠", 3, true),
+      s("K1101-1", "16", "王稜雅", 2, true),
+      s("C1112-1", "52", "張月珠", 1, false),
+      s("B5108-1", "89", "張家稜", 2, false),
+      m("F6203-1", "袖長加長 2cm\n領口改圓領", "張家稜", 1, false),
+      m("K5104-1", "下擺改短 3cm", "王稜雅", 2, true),
+    ] };
+  }
+
+  // 瀏覽器存檔可能被封鎖，失敗時改用記憶體
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 只存在記憶體 */ } },
+  };
+  function load() {
+    try { const d = JSON.parse(store.get(KEY)); if (d && Array.isArray(d.items)) return d; } catch (e) { /* 重建 */ }
+    return seed();
+  }
+  let db = load();
+  const persist = () => store.set(KEY, JSON.stringify(db));
+  persist();
+
+  // 排序：品牌 → 急件 → 系列別 → 排單日期
+  const cmp = (a, b) =>
+    brandRank(a.brand) - brandRank(b.brand) || (b.urgent - a.urgent) ||
+    (a.series || "~").localeCompare(b.series || "~") || a.date.localeCompare(b.date) || a.id - b.id;
+
+  function groups(filter = () => true) {
+    const list = db.items.filter(filter).sort(cmp);
+    return {
+      IRIS: list.filter(x => x.type === "sample" && x.brand === "IRIS"),
+      IRISGIRLS: list.filter(x => x.type === "sample" && x.brand === "IRISGIRLS"),
+      mod: list.filter(x => x.type === "mod"),
+    };
+  }
+  const SECTIONS = [
+    { key: "IRIS", title: "IRIS", cls: "iris" },
+    { key: "IRISGIRLS", title: "IRISGIRLS", cls: "girls" },
+    { key: "mod", title: "修改", cls: "mod" },
+  ];
+  const statusTag = r => r.status === "製作中" ? `<span class="st-tag doing">製作中・${esc(r.taker)}</span>`
+    : r.status === "完成" ? `<span class="st-tag done">完成・${esc(r.taker)}</span>`
+    : `<span class="st-tag wait">待取</span>`;
+  const brandTag = b => b ? `<span class="brandtag ${b === "IRIS" ? "iris" : "girls"}">${b}</span>` : `<span class="normtag">—</span>`;
+
+  const api = {
+    COLORS, DESIGNERS, MAKERS, STYLES, SECTIONS,
+    seriesOf, brandOf, esc, ymd, todayISO, nowText, groups, statusTag, brandTag,
+    items: () => db.items,
+    get: id => db.items.find(x => x.id === id),
+    add(item) { const it = { id: ++db.seq, status: "待取", taker: "", ...item }; db.items.push(it); persist(); return it; },
+    update(id, patch) { const it = api.get(id); if (it) { Object.assign(it, patch); persist(); } return it; },
+    remove(id) { db.items = db.items.filter(x => x.id !== id); persist(); },
+    reset() { db = seed(); persist(); },
+    getUser(role, list) { const u = store.get(`${KEY}.user.${role}`); return list.includes(u) ? u : list[0]; },
+    setUser(role, u) { store.set(`${KEY}.user.${role}`, u); },
+  };
+  return api;
+})();
+
+const S = SCHED, esc = S.esc, ymd = S.ymd;
+const $ = id => document.getElementById(id);
+
+/* ===== 頁內確認視窗與提示 ===== */
+function ask(msg, okText = "確定", tone = "") {
+  return new Promise(resolve => {
+    $("askMsg").textContent = msg;
+    $("askYes").textContent = okText;
+    $("askYes").className = "ok " + tone;
+    $("askMask").classList.add("on");
+    document.body.classList.add("lock");
+    $("askYes").focus();
+    const done = v => {
+      $("askMask").classList.remove("on");
+      if (!$("mask").classList.contains("on")) document.body.classList.remove("lock");
+      $("askYes").onclick = $("askNo").onclick = null;
+      resolve(v);
+    };
+    $("askYes").onclick = () => done(true);
+    $("askNo").onclick = () => done(false);
+    $("askMask").onclick = e => { if (e.target === $("askMask")) done(false); };
+  });
+}
+let toastTimer;
+function toast(msg) {
+  $("toast").textContent = msg;
+  $("toast").classList.add("on");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $("toast").classList.remove("on"), 2200);
+}
+
+/* ===================== 製樣排程管理 ===================== */
+const Manage = (() => {
+  let currentUser = S.getUser("designer", S.DESIGNERS);
+  const urgToggle = r => `<label class="urgtoggle"><input type="checkbox" data-urg="${r.id}" ${r.urgent ? "checked" : ""} aria-label="急件">${r.urgent ? '<span class="urgtag">急件</span>' : '<span class="normtag">一般</span>'}</label>`;
+  const delBtn = r => `<button class="del" data-del="${r.id}" title="刪除" aria-label="刪除">✕</button>`;
+
+  function sectionHTML(sec, list) {
+    const isMod = sec.key === "mod";
+    const urg = list.filter(r => r.urgent).length;
+    const head = `<h2><span class="kindtag ${sec.cls}">${sec.title}</span>${isMod ? "修改排程" : "樣本排程"}
+      <span class="badge">${list.length}</span><span class="badge urg">急件 ${urg}</span></h2>`;
+    const empty = `<div class="emptymsg">目前沒有${isMod ? "修改" : sec.title + " 樣本"}排程</div>`;
+    const thead = isMod
+      ? `<tr><th>序號</th><th>品牌</th><th>排修日</th><th>修改號</th><th>修改內容</th><th>設計師</th><th>急件識別</th><th>狀態</th><th></th></tr>`
+      : `<tr><th>序號</th><th>系列別</th><th>樣本號</th><th>色號</th><th>設計師</th><th>排樣日</th><th>急件識別</th><th>狀態</th><th></th></tr>`;
+    const rows = list.map((r, i) => isMod ? `
+      <tr class="${r.urgent ? "isurg" : ""}">
+        <td class="num">${i + 1}</td><td>${S.brandTag(r.brand)}</td>
+        <td class="mono nowrap">${ymd(r.date)}</td><td class="mono nowrap">${esc(r.no) || "—"}</td>
+        <td class="content">${esc(r.text)}</td><td class="nowrap">${esc(r.designer)}</td>
+        <td>${urgToggle(r)}</td><td>${S.statusTag(r)}</td><td>${delBtn(r)}</td>
+      </tr>` : `
+      <tr class="${r.urgent ? "isurg" : ""}">
+        <td class="num">${i + 1}</td><td class="mono">${esc(r.series)}</td>
+        <td class="mono">${esc(r.style)}</td><td class="mono">${esc(r.color)}</td>
+        <td class="nowrap">${esc(r.designer)}</td><td class="mono">${ymd(r.date)}</td>
+        <td>${urgToggle(r)}</td><td>${S.statusTag(r)}</td><td>${delBtn(r)}</td>
+      </tr>`).join("");
+    const cards = list.map(r => isMod ? `
+      <div class="mcard ${r.urgent ? "isurg" : ""}">
+        <div class="minfo">
+          <div class="st">${esc(r.no) || "（未填修改號）"}</div>
+          <div class="meta">${r.brand ? S.brandTag(r.brand) : ""}<span>設計師 <b class="name">${esc(r.designer)}</b></span><span>排修 <b>${ymd(r.date)}</b></span></div>
+          <div class="txt">${esc(r.text)}</div>
+          <div class="meta">${S.statusTag(r)}</div>
+        </div>
+        <div class="mside">${urgToggle(r)}${delBtn(r)}</div>
+      </div>` : `
+      <div class="mcard ${r.urgent ? "isurg" : ""}">
+        <div class="minfo">
+          <div class="st">${esc(r.style)}　色 ${esc(r.color)}</div>
+          <div class="meta"><span>系列 <b>${esc(r.series)}</b></span><span>設計師 <b class="name">${esc(r.designer)}</b></span><span>排樣 <b>${ymd(r.date)}</b></span></div>
+          <div class="meta">${S.statusTag(r)}</div>
+        </div>
+        <div class="mside">${urgToggle(r)}${delBtn(r)}</div>
+      </div>`).join("");
+    return `<div class="card ${sec.cls}">${head}
+      <div class="wrap">${list.length ? `<table><thead>${thead}</thead><tbody>${rows}</tbody></table>` : empty}</div>
+      <div class="mlist">${list.length ? cards : empty}</div>
+    </div>`;
+  }
+
+  function render() {
+    $("mWho").value = currentUser;
+    const G = S.groups();
+    $("mSections").innerHTML = S.SECTIONS.map(sec => sectionHTML(sec, G[sec.key])).join("");
+  }
+
+  // 新增視窗
+  const mask = $("mask"), err = $("err");
+  $("styleOpts").innerHTML = S.STYLES.map(s => `<option value="${s}">${S.brandOf(s)}</option>`).join("");
+  $("colorOpts").innerHTML = S.COLORS.map(c => `<option value="${c}">`).join("");
+  $("colorHint").textContent = "可用色號：" + S.COLORS.join("、");
+  $("mWho").innerHTML = S.DESIGNERS.map(d => `<option>${d}</option>`).join("");
+  $("mWho").onchange = e => { currentUser = e.target.value; S.setUser("designer", currentUser); render(); };
+  let kind = "sample";
+
+  function setKind(k) {
+    kind = k;
+    document.querySelectorAll(".seg button").forEach(b => b.classList.toggle("on", b.dataset.kind === k));
+    $("formSample").hidden = k !== "sample";
+    $("formMod").hidden = k !== "mod";
+    $("saveAdd").textContent = k === "sample" ? "加入樣本排程" : "加入修改排程";
+    $("saveAdd").classList.toggle("mod", k === "mod");
+    err.textContent = "";
+    (k === "sample" ? $("fStyle") : $("fModNo")).focus();
+  }
+  function openDlg() {
+    ["fStyle", "fBrand", "fSeries", "fColor", "fModNo", "fModText"].forEach(id => $(id).value = "");
+    $("modBrandHint").textContent = "";
+    $("fSampleDate").value = $("fModDate").value = S.todayISO();
+    $("fUrgent").checked = $("fModUrgent").checked = false;
+    document.querySelectorAll(".chk").forEach(c => c.classList.remove("on"));
+    mask.classList.add("on");
+    document.body.classList.add("lock");
+    setKind(kind);
+  }
+  const closeDlg = () => { mask.classList.remove("on"); document.body.classList.remove("lock"); };
+  function fail(msg, id) { err.textContent = msg; $(id)?.focus(); }
+
+  function save() {
+    if (kind === "sample") {
+      const style = $("fStyle").value.trim().toUpperCase();
+      const color = $("fColor").value.trim();
+      const series = $("fSeries").value.trim();
+      const brand = S.brandOf(style);
+      if (!S.STYLES.includes(style)) return fail("請從清單中選擇樣本號", "fStyle");
+      if (!brand) return fail("樣號第 2 碼須為 1、2、5、6 才能判斷品牌", "fStyle");
+      if (!series) return fail("請輸入系列別", "fSeries");
+      if (!S.COLORS.includes(color)) return fail("色號請輸入：" + S.COLORS.join("、"), "fColor");
+      if (!$("fSampleDate").value) return fail("請選擇排樣日", "fSampleDate");
+      if (S.items().some(r => r.type === "sample" && r.style === style && r.color === color && r.status !== "完成"))
+        return fail(`${style} 色號 ${color} 已經在排程中`, "fColor");
+      S.add({ type: "sample", style, brand, series, color, designer: currentUser, date: $("fSampleDate").value, urgent: $("fUrgent").checked });
+      toast(`已加入 ${brand} 樣本 ${style} 色號 ${color}`);
+    } else {
+      const no = $("fModNo").value.trim();
+      const text = $("fModText").value.trim();
+      if (!$("fModDate").value) return fail("請選擇排修日", "fModDate");
+      if (!text) return fail("請輸入修改內容", "fModText");
+      const brand = S.brandOf(no);
+      S.add({ type: "mod", no, text, brand, series: brand ? S.seriesOf(no) : "", designer: currentUser, date: $("fModDate").value, urgent: $("fModUrgent").checked });
+      toast(`已加入修改 ${no || ""}`);
+    }
+    closeDlg();
+    render();
+  }
+
+  $("openAdd").onclick = openDlg;
+  $("cancelAdd").onclick = closeDlg;
+  $("saveAdd").onclick = save;
+  document.querySelectorAll(".seg button").forEach(b => b.onclick = () => setKind(b.dataset.kind));
+  mask.addEventListener("click", e => { if (e.target === mask) closeDlg(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && mask.classList.contains("on") && !$("askMask").classList.contains("on")) closeDlg(); });
+  $("fStyle").addEventListener("input", e => { $("fBrand").value = S.brandOf(e.target.value); $("fSeries").value = S.seriesOf(e.target.value); });
+  $("fModNo").addEventListener("input", e => {
+    const b = S.brandOf(e.target.value);
+    $("modBrandHint").innerHTML = b ? `品牌：<b>${b}</b>　系列：<b>${esc(S.seriesOf(e.target.value))}</b>` : "";
+  });
+  $("fColor").addEventListener("input", e => { e.target.value = e.target.value.replace(/\D/g, ""); });
+  ["fUrgent", "fModUrgent"].forEach(id => $(id).addEventListener("change", e => e.target.closest(".chk").classList.toggle("on", e.target.checked)));
+  mask.addEventListener("input", () => err.textContent = "");
+
+  $("mSections").addEventListener("click", async e => {
+    const btn = e.target.closest("[data-del]");
+    if (!btn) return;
+    const r = S.get(+btn.dataset.del);
+    const label = r.type === "sample" ? `${r.style} 色號 ${r.color} 的樣本排程` : `修改號 ${r.no || "（未填）"} 的修改排程`;
+    const taken = r.status !== "待取" ? `\n（${r.taker} 已取件，狀態：${r.status}）` : "";
+    if (await ask(`確定刪除 ${label}？${taken}`, "刪除", "danger")) { S.remove(r.id); render(); toast("已刪除"); }
+  });
+  $("mSections").addEventListener("change", e => {
+    const id = e.target.dataset.urg;
+    if (id !== undefined) { S.update(+id, { urgent: e.target.checked }); render(); }
+  });
+  return { render };
+})();
+
+/* ===================== 樣本師取工作 ===================== */
+const Maker = (() => {
+  let me = S.getUser("maker", S.MAKERS);
+  let tab = "wait";
+  const label = r => r.type === "sample" ? `樣本 ${r.style} 色號 ${r.color}` : `修改 ${r.no || "（未填修改號）"}`;
+
+  function jobCard(r) {
+    const isMod = r.type === "mod";
+    const head = isMod
+      ? `<div class="code">${esc(r.no) || "（未填修改號）"}</div>`
+      : `<div class="code">${esc(r.style)}<small>色號 <b>${esc(r.color)}</b></small></div>`;
+    let acts;
+    if (r.status === "待取") acts = `<button class="take ${isMod ? "mod" : ""}" data-take="${r.id}">${isMod ? "取修改" : "取樣本"}</button>`;
+    else if (r.status === "製作中") acts = `<button class="putback" data-back="${r.id}">放回</button><button class="finish" data-done="${r.id}">✓ 完成</button>`;
+    else acts = `<div class="doneat">✓ 完成於 ${esc(r.doneAt || "")}</div>`;
+    return `<div class="job ${r.urgent ? "isurg" : ""} ${r.status === "完成" ? "isdone" : ""}">
+      <div class="top">
+        ${S.brandTag(r.brand)}
+        ${r.series ? `<span class="badge">系列 ${esc(r.series)}</span>` : ""}
+        <span class="grow"></span>
+        ${r.urgent ? '<span class="urgtag">急件</span>' : ""}
+        ${tab === "mine" ? S.statusTag(r) : ""}
+      </div>
+      ${head}
+      ${isMod ? `<div class="txt">${esc(r.text)}</div>` : ""}
+      <div class="meta">
+        <span>${isMod ? "排修日" : "排樣日"} <b class="mono">${ymd(r.date)}</b></span>
+        <span>設計師 <b>${esc(r.designer)}</b></span>
+        ${r.takenAt ? `<span>取件 <b class="mono">${esc(r.takenAt)}</b></span>` : ""}
+      </div>
+      <div class="jacts">${acts}</div>
+    </div>`;
+  }
+  function sectionHTML(sec, list, suffix = "") {
+    const urg = list.filter(r => r.urgent).length;
+    const name = sec.key === "mod" ? "修改" : sec.title + " 樣本";
+    return `<div class="card ${sec.cls}">
+      <h2><span class="kindtag ${sec.cls}">${sec.title}</span>${sec.key === "mod" ? "修改" : "樣本"}${suffix}
+        <span class="badge">${list.length}</span>${urg ? `<span class="badge urg">急件 ${urg}</span>` : ""}</h2>
+      <div class="mlist">${list.length ? list.map(jobCard).join("") : `<div class="emptymsg">目前沒有${tab === "wait" ? "待取的" : "製作中的"}${name}</div>`}</div>
+    </div>`;
+  }
+  function render() {
+    $("kWho").value = me;
+    const items = S.items();
+    $("cWait").textContent = items.filter(r => r.status === "待取").length;
+    $("cMine").textContent = items.filter(r => r.taker === me && r.status === "製作中").length;
+    document.querySelectorAll("#viewMaker .tab").forEach(t => t.classList.toggle("on", t.dataset.tab === tab));
+    if (tab === "wait") {
+      const G = S.groups(r => r.status === "待取");
+      $("kSections").innerHTML = S.SECTIONS.map(sec => sectionHTML(sec, G[sec.key])).join("");
+    } else {
+      const G = S.groups(r => r.taker === me && r.status === "製作中");
+      const done = items.filter(r => r.taker === me && r.status === "完成").sort((a, b) => (b.doneAt || "").localeCompare(a.doneAt || ""));
+      $("kSections").innerHTML = S.SECTIONS.map(sec => sectionHTML(sec, G[sec.key], "・製作中")).join("") +
+        (done.length ? `<div class="card done"><h2><span class="kindtag done">已完成</span>我完成的工作 <span class="badge">${done.length}</span></h2>
+          <div class="mlist">${done.map(jobCard).join("")}</div></div>` : "");
+    }
+  }
+
+  document.querySelectorAll("#viewMaker .tab").forEach(t => t.onclick = () => { tab = t.dataset.tab; render(); window.scrollTo(0, 0); });
+  $("kSections").addEventListener("click", async e => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    const d = b.dataset;
+    if (d.take) {
+      const r = S.get(+d.take);
+      if (!r || r.status !== "待取") { toast("這筆工作已經被取走或刪除了"); render(); return; }
+      if (!(await ask(`確定要取 ${label(r)}？`, r.type === "mod" ? "取修改" : "取樣本", r.type === "mod" ? "mod" : ""))) return;
+      S.update(r.id, { status: "製作中", taker: me, takenAt: S.nowText() });
+      render(); toast(`已取 ${label(r)}，在「我的工作」`);
+    }
+    if (d.done) {
+      const r = S.get(+d.done);
+      if (await ask(`${label(r)} 已經完成了嗎？`, "✓ 完成", "done")) { S.update(r.id, { status: "完成", doneAt: S.nowText() }); render(); toast("已標記完成"); }
+    }
+    if (d.back) {
+      const r = S.get(+d.back);
+      if (await ask(`把 ${label(r)} 放回待取工作？`, "放回")) { S.update(r.id, { status: "待取", taker: "", takenAt: "" }); render(); toast("已放回待取工作"); }
+    }
+  });
+  $("kWho").innerHTML = S.MAKERS.map(m => `<option>${m}</option>`).join("");
+  $("kWho").onchange = e => { me = e.target.value; S.setUser("maker", me); render(); };
+  return { render };
+})();
+
+/* ===================== 畫面切換（#manage / #maker） ===================== */
+function show(view) {
+  const maker = view === "maker";
+  $("viewManage").hidden = maker;
+  $("viewMaker").hidden = !maker;
+  $("goManage").classList.toggle("on", !maker);
+  $("goMaker").classList.toggle("on", maker);
+  (maker ? Maker : Manage).render();
+}
+const route = () => show(location.hash === "#maker" ? "maker" : "manage");
+$("goManage").onclick = () => { if (location.hash !== "#manage") location.hash = "manage"; else route(); };
+$("goMaker").onclick = () => { if (location.hash !== "#maker") location.hash = "maker"; else route(); };
+window.addEventListener("hashchange", route);
+$("resetDemo").onclick = async () => {
+  if (await ask("把所有資料恢復成示範資料？目前新增、取件的紀錄都會清除。", "重設", "danger")) { S.reset(); route(); toast("已恢復示範資料"); }
+};
+route();
+</script>
+</body>
+</html>
